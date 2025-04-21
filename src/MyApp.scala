@@ -14,9 +14,11 @@ object MyApp extends App {
   // read data from file
   val mapdata = readFile("data.txt")
   // print data to check it's been read in correctly
-  println(mapdata)
+  println("Data loaded successfully.")
 
-  var basket: Map[String, Float] = Map()
+  displayAvailableItems()
+
+  var basket: Map[String, Int] = Map()
 
   // define menu options as a Map of actions
   // for each menu item:
@@ -59,6 +61,13 @@ object MyApp extends App {
     readInt()
   }
 
+  def displayAvailableItems(): Unit = {
+    println("\nAvailable food items:")
+    println("-------------------")
+    mapdata.keys.toList.sorted.foreach(food => println(food))
+    println("-------------------")
+  }
+
   // invokes selected menu option
   // finds corresponding function to invoke in action map using get
   // pattern matching used as get returns an Option
@@ -78,7 +87,7 @@ object MyApp extends App {
   }
 
   def handleHighestLowest(): Boolean = {
-    mnuShowHighestLowest(getHighestLowestPrices)
+    mnuShowFoodValue(getHighestLowestPrices, "Highest and Lowest")
     true
   }
 
@@ -101,8 +110,6 @@ object MyApp extends App {
     println("Exiting application. Goodbye!")
     false
   }
-
-
 
   // *******************************************************************************************************************
   // UTILITY FUNCTIONS
@@ -130,15 +137,15 @@ object MyApp extends App {
   }
 
   //helper to calculate median
-  def median(list: List[Int]): Double = {
+  def median(list: List[Int]): Int = {
     val sortedList = list.sorted
     val size = sortedList.size
     if (size % 2 == 0) {
       //even number of elements, average the middle two
-      (sortedList(size / 2 - 1) + sortedList(size / 2)) / 2.0
+      (sortedList(size / 2 - 1) + sortedList(size / 2)) / 2.0.toInt
     } else {
       //odd number of elements, take the middle one
-      sortedList(size / 2).toDouble
+      sortedList(size / 2)
     }
   }
 
@@ -157,26 +164,27 @@ object MyApp extends App {
     list.sum.toDouble / list.length
   }
 
+  //helper to convert pence to pounds and return formatted string
+  def penceToPounds(pence: Int): String = f"£${pence/100.0}%.2f"
+  def penceToPounds(pence: Double): String = f"£${pence / 100.0}%.2f"
+
+
   // *******************************************************************************************************************
   // FUNCTIONS THAT INVOKE ACTION AND INTERACT WITH USER
   // each of these functions accepts user input if required for an operation,
   // invokes the relevant operation function and displays the results
 
+  // Generic function to display a single value for a specific food item with conversion to pounds
   def mnuShowFoodValue[A](getValueFunc: String => Option[A], valueType: String) = {
     println("Enter food item:")
     val food = readLine.toUpperCase
     getValueFunc(food) match {
-      case Some(value) => println(s"$food: $valueType is ${value}p")
-      case None => println(s"Food '$food' not found.")
-    }
-  }
-
-  def mnuShowHighestLowest(f: (String) => Option[(Int, Int)]) = {
-    println("Enter food item:")
-    val food = readLine.toUpperCase
-    f(food) match {
-      case Some((high, low)) =>
-        println(s"$food: Highest price: ${high}p, Lowest price: ${low}p")
+      case Some(value: Int) => println(s"$food: $valueType is ${penceToPounds(value)}")
+      case Some(value: Double) => println(s"$food: $valueType is ${penceToPounds(value)}")
+      case Some(value: (Int, Int)) =>
+        val (high, low) = value
+        println(s"$food: Highest price: ${penceToPounds(high)}, Lowest price: ${penceToPounds(low)}")
+      case Some(value) => println(s"$food: $valueType is $value")  // Fallback for other types
       case None => println(s"Food '$food' not found.")
     }
   }
@@ -190,18 +198,19 @@ object MyApp extends App {
     val (name1, avg1, name2, avg2) = f(food1, food2)
 
     if (avg1 > 0 && avg2 > 0) {
-      println(s"Average price for $name1: ${avg1}p")
-      println(s"Average price for $name2: ${avg2}p")
+      println(s"Average price for $name1: ${penceToPounds(avg1)}")
+      println(s"Average price for $name2: ${penceToPounds(avg2)}")
       val difference = Math.abs(avg1 - avg2)
       val higherFood = if (avg1 > avg2) name1 else name2
-      println(s"$higherFood is more expensive on average by ${difference}p")
+      println(s"$higherFood is more expensive on average by ${penceToPounds(difference)}")
     }
   }
 
-  def mnuBasketTotal(f: (Map[String, Int]) => (Float, Map[String, Float])) = {
+  def mnuBasketTotal(f: (Map[String, Int]) => (Int, Map[String, Int])) = {
     var continueAdding = true
     basket = Map() // Reset basket
 
+    println("\nBuild your basket:")
     while (continueAdding) {
       println("Enter food item (or 'DONE' to finish):")
       val food = readLine.toUpperCase
@@ -213,7 +222,7 @@ object MyApp extends App {
           println("Enter quantity (kg/litres):")
           try {
             val quantity = readInt()
-            basket = basket + (food -> (basket.getOrElse(food, 0f) + quantity))
+            basket = basket + (food -> (basket.getOrElse(food, 0) + quantity))
           } catch {
             case _: Exception => println("Invalid quantity. Please enter a number.")
           }
@@ -228,9 +237,9 @@ object MyApp extends App {
       println("\nYour basket:")
       itemPrices.foreach { case (food, price) =>
         val currentPrice = getCurrentPrice(food).getOrElse(0)
-        println(f"$food: ${basket(food)}%.2f kg/l at ${currentPrice}p = ${price}%.2fp")
+        println(f"$food: ${basket(food)}%.2f kg/l at ${penceToPounds(currentPrice)} = ${penceToPounds(price)}")
       }
-      println(f"\nTotal basket value: ${total}%.2fp")
+      println(s"\nTotal basket value: ${penceToPounds(total)}")
     } else {
       println("Basket is empty.")
     }
@@ -251,7 +260,7 @@ object MyApp extends App {
     if (prices == List(0)) None else Some((prices.max, prices.min))
   }
 
-  def getMedianPrice(food: String): Option[Double] = {
+  def getMedianPrice(food: String): Option[Int] = {
     val prices = exists(food)
     if (prices == List(0)) None else Some(median(prices))
   }
@@ -266,7 +275,7 @@ object MyApp extends App {
     (food1.toUpperCase, avg1, food2.toUpperCase, avg2)
   }
 
-  def calculateBasketTotal(basket: Map[String, Int]): (Float, Map[String, Int]) = {
+  def calculateBasketTotal(basket: Map[String, Int]): (Int, Map[String, Int]) = {
     val itemPrices = basket.flatMap { case (food, quantity) =>
       getCurrentPrice(food).map(price => food -> (price * quantity))
     }
