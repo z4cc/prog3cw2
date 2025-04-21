@@ -5,48 +5,39 @@
 import scala.collection.immutable.ListMap
 import scala.io.Source
 import scala.io.StdIn.{readInt, readLine}
+import scala.util.{Try, Success, Failure}
+import scala.annotation.tailrec
 
 object MyApp extends App {
 
   // *******************************************************************************************************************
   // application logic
 
-  // read data from file
   private val mapdata = readFile("data.txt")
-  // print data to check it's been read in correctly
-  println("Data loaded successfully.")
 
-  displayAvailableItems()
+  // Print status based on data load result
+  if (mapdata.nonEmpty) {
+    println("Data loaded successfully.")
+    displayAvailableItems()
+    runMenu()
+  } else {
+    println("Failed to load data. Exiting application.")
+  }
 
-  private var basket: Map[String, Int] = Map()
-
-  // define menu options as a Map of actions
-  // for each menu item:
-  // key is an Int, the value that will be read from the input
-  // value is a function () => Boolean, i.e. no params and returns Boolean
-  private val actionMap = Map[Int, () => Boolean](
-    1 -> handleCurrentPrice,
-    2 -> handleHighestLowest,
-    3 -> handleMedian,
-    4 -> handleCompareAverage,
-    5 -> handleBasket,
-    6 -> handleQuit
-  )
-
-  // loop to read input and invoke menu option
-  // uses function readOption to show menu and read input
-  // uses function menu to invoke menu action
-  // will terminate if menu returns false
-  private var opt = 0
-  do {
-    opt = readOption
-  } while (menu(opt))
-
+  private def addToBasket(currentBasket: Map[String, Int], food: String, quantity: Int): Map[String, Int] = {
+    currentBasket + (food -> (currentBasket.getOrElse(food, 0) + quantity))
+  }
 
   // *******************************************************************************************************************
   // FUNCTIONS FOR MENU
 
-  // shows menu and reads input
+  @tailrec
+  private def runMenu(): Unit = {
+    val option = readOption
+    val shouldContinue = handleAction(option)
+    if (shouldContinue) runMenu()
+  }
+
   private def readOption: Int = {
     println(
       """|
@@ -58,24 +49,35 @@ object MyApp extends App {
          |  4 - Compare average prices of two foods
          |  5 - Calculate food basket total
          |  6 - Quit""".stripMargin)
-    readInt()
+
+    Try(readInt()).getOrElse {
+      println("Invalid input. Please enter a number.")
+      readOption //try again
+    }
   }
 
   private def displayAvailableItems(): Unit = {
     println("\nAvailable food items:")
     println("-------------------")
-    mapdata.keys.toList.sorted.foreach(food => println(food))
+    mapdata.keys.toList.sorted.foreach(println)
     println("-------------------")
   }
 
-  // invokes selected menu option
-  // finds corresponding function to invoke in action map using get
-  // pattern matching used as get returns an Option
-  private def menu(option: Int): Boolean = {
+  //using a map to dispatch actions
+  private def handleAction(option: Int): Boolean = {
+    val actionMap = Map[Int, () => Boolean](
+      1 -> handleCurrentPrice,
+      2 -> handleHighestLowest,
+      3 -> handleMedian,
+      4 -> handleCompareAverage,
+      5 -> handleBasket,
+      6 -> handleQuit
+    )
+
     actionMap.get(option) match {
       case Some(f) => f()
       case None =>
-        println("Sorry, that command is not recognized")
+        println("Sorry, that command is not recognised")
         true
     }
   }
@@ -141,28 +143,23 @@ object MyApp extends App {
   private def median(list: List[Int]): Int = {
     val sortedList = list.sorted
     val size = sortedList.size
+
     if (size % 2 == 0) {
-      //even number of elements, average the middle two
-      (sortedList(size / 2 - 1) + sortedList(size / 2)) / 2.0.toInt
+      val middleIndices = List(size/2 - 1, size/2)
+      middleIndices.map(sortedList(_)).sum / 2
     } else {
-      //odd number of elements, take the middle one
       sortedList(size / 2)
     }
   }
 
   //helper to check if food exists and return its prices if it does
-  private def exists(food: String): List[Int] = {
-    mapdata.get(food.toUpperCase()) match {
-      case Some(prices) => prices
-      case None =>
-        println(s"Food '$food' not found.")
-        List(0)
-    }
+  private def getFoodPrices(food: String): Option[List[Int]] = {
+    mapdata.get(food.toUpperCase)
   }
 
   //helper to calculate average
   private def average(list: List[Int]): Double = {
-    list.sum.toDouble / list.length
+    if (list.isEmpty) 0.0 else list.sum.toDouble / list.length
   }
 
   //helper to convert pence to pounds and return formatted string
@@ -179,16 +176,18 @@ object MyApp extends App {
   private def mnuShowFoodValue[A](getValueFunc: String => Option[A], valueType: String): Unit = {
     println("Enter food item:")
     val food = readLine.toUpperCase
+
     getValueFunc(food) match {
       case Some(value: Int) => println(s"$food: $valueType is ${penceToPounds(value)}")
       case Some(value: Double) => println(s"$food: $valueType is ${penceToPounds(value)}")
       case Some(value: (Int, Int)) =>
         val (high, low) = value
         println(s"$food: Highest price: ${penceToPounds(high)}, Lowest price: ${penceToPounds(low)}")
-      case Some(value) => println(s"$food: $valueType is $value")  // Fallback for other types
+      case Some(value) => println(s"$food: $valueType is $value")
       case None => println(s"Food '$food' not found.")
     }
   }
+
 
   private def mnuCompareAverages(f: (String, String) => (String, Double, String, Double)): Unit = {
     println("Enter first food:")
@@ -207,31 +206,41 @@ object MyApp extends App {
     }
   }
 
-  private def mnuBasketTotal(f: (Map[String, Int]) => (Int, Map[String, Int])): Unit = {
-    var continueAdding = true
-    basket = Map() // Reset basket
+  private def mnuBasketTotal(f: Map[String, Int] => (Int, Map[String, Int])): Unit = {
+    val basket = buildBasket()
+    showBasketTotal(f, basket)
+  }
 
-    println("\nBuild your basket:")
-    while (continueAdding) {
+  private def buildBasket(): Map[String, Int] = {
+    @tailrec
+    def addItems(currentBasket: Map[String, Int]): Map[String, Int] = {
       println("Enter food item (or 'DONE' to finish):")
       val food = readLine.toUpperCase
 
       if (food == "DONE") {
-        continueAdding = false
+        currentBasket
       } else {
         if (mapdata.contains(food)) {
           println("Enter quantity (kg/litres):")
-          try {
-            val quantity = readInt()
-            basket = basket + (food -> (basket.getOrElse(food, 0) + quantity))
-          } catch {
-            case _: Exception => println("Invalid quantity. Please enter a number.")
+          Try(readInt()) match {
+            case Success(quantity) =>
+              addItems(currentBasket + (food -> (currentBasket.getOrElse(food, 0) + quantity)))
+            case Failure(_) =>
+              println("Invalid quantity. Please enter a number.")
+              addItems(currentBasket)
           }
         } else {
           println(s"Warning: Food item '$food' not recognised.")
+          addItems(currentBasket)
         }
       }
     }
+
+    println("\nBuild your basket:")
+    addItems(Map())
+  }
+
+  private def showBasketTotal(f: Map[String, Int] => (Int, Map[String, Int]), basket: Map[String, Int]): Unit = {
     val (total, itemPrices) = f(basket)
 
     if (itemPrices.nonEmpty) {
@@ -252,26 +261,20 @@ object MyApp extends App {
   // the results to be displayed - does not interact with user
 
   private def getCurrentPrice(food: String): Option[Int] = {
-    val prices = exists(food)
-    if (prices == List(0)) None else Some(prices.last)
+    getFoodPrices(food).map(_.last)
   }
 
   private def getHighestLowestPrices(food: String): Option[(Int, Int)] = {
-    val prices = exists(food)
-    if (prices == List(0)) None else Some((prices.max, prices.min))
+    getFoodPrices(food).map(prices => (prices.max, prices.min))
   }
 
   private def getMedianPrice(food: String): Option[Int] = {
-    val prices = exists(food)
-    if (prices == List(0)) None else Some(median(prices))
+    getFoodPrices(food).map(median)
   }
 
   private def compareAveragePrices(food1: String, food2: String): (String, Double, String, Double) = {
-    val prices1 = exists(food1)
-    val prices2 = exists(food2)
-
-    val avg1 = if (prices1 == List(0)) 0.0 else average(prices1)
-    val avg2 = if (prices2 == List(0)) 0.0 else average(prices2)
+    val avg1 = getFoodPrices(food1.toUpperCase).map(prices => average(prices)).getOrElse(0.0)
+    val avg2 = getFoodPrices(food2.toUpperCase).map(prices => average(prices)).getOrElse(0.0)
 
     (food1.toUpperCase, avg1, food2.toUpperCase, avg2)
   }
@@ -285,7 +288,7 @@ object MyApp extends App {
 
     (total, itemPrices)
   }
+}
 
   // *******************************************************************************************************************
 
-}
