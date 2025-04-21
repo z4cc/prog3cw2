@@ -99,6 +99,33 @@ object MyApp extends App {
     mapBuffer
   }
 
+//helper to calculate median
+  def median(list: List[Int]): Double = {
+    val sortedList = list.sorted
+    val size = sortedList.size
+    if (size % 2 == 0) {
+      //even number of elements, average the middle two
+      (sortedList(size / 2 - 1) + sortedList(size / 2)) / 2.0
+    } else {
+      //odd number of elements, take the middle one
+      sortedList(size / 2).toDouble
+    }
+  }
+
+  //helper to check if food exists and return its prices if it does
+  def exists(food: String): List[Int] = {
+    mapdata.get(food.toUpperCase()) match {
+      case Some(prices) => prices
+      case None =>
+        println(s"Food '$food' not found.")
+        List(0)
+    }
+  }
+
+  //helper to calculate average
+  def average(list: List[Int]): Double = {
+    list.sum.toDouble / list.length
+  }
 
   // *******************************************************************************************************************
   // FUNCTIONS THAT INVOKE ACTION AND INTERACT WITH USER
@@ -120,19 +147,40 @@ object MyApp extends App {
   // each of these performs the required operation on the data and returns
   // the results to be displayed - does not interact with user
 
-  def getCurrentPrice(): Map[String, Int] = {
-    mapdata.map {case (food, prices) => food -> prices.last}
+  def getCurrentPrice(food: String): Option[Int] = {
+    val prices = exists(food)
+    if (prices == List(0)) None else Some(prices.last)
   }
 
-  def getHighestLowestPrices(): Map[String, (Int, Int)] = {
-    mapdata.map {
-      case (food, prices) =>
-      food -> (prices.max, prices.min)
+  def getHighestLowestPrices(food: String): Option[(Int, Int)] = {
+    val prices = exists(food)
+    if (prices == List(0)) None else Some((prices.max, prices.min))
+  }
+
+  def getMedianPrice(food: String): Option[Double] = {
+    val prices = exists(food)
+    if (prices == List(0)) None else Some(median(prices))
+  }
+
+  def compareAveragePrices(food1: String, food2: String): (String, Double, String, Double) = {
+    val prices1 = exists(food1)
+    val prices2 = exists(food2)
+
+    val avg1 = if (prices1 == List(0)) 0.0 else average(prices1)
+    val avg2 = if (prices2 == List(0)) 0.0 else average(prices2)
+
+    (food1.toUpperCase, avg1, food2.toUpperCase, avg2)
+  }
+
+  def calculateBasketTotal(basket: Map[String, Float]): (Float, Map[String, Float]) = {
+    val itemPrices = basket.flatMap { case (food, quantity) =>
+      getCurrentPrice(food).map(price => food -> (price * quantity))
     }
+
+    val total = itemPrices.values.sum
+
+    (total, itemPrices)
   }
-
-
-
 
   // *******************************************************************************************************************
 
