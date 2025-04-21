@@ -120,19 +120,18 @@ object MyApp extends App {
   // each of these performs the required operation on the data and returns
   // the results to be displayed - does not interact with user
 
-  def currentPoints(): Map[String, Int] = {
-    // sort map by value in descending order -
-    // see http://alvinalexander.com/scala/how-to-sort-map-in-scala-key-value-sortby-sortwith
-    ListMap(mapdata.toSeq.sortWith(_._2 > _._2): _*)
+  def getCurrentPrice(): Map[String, Int] = {
+    mapdata.map {case (food, prices) => food -> prices.last}
   }
 
-  def currentPointsForTeam(team: String): (String, Int) = {
-    val points = mapdata.get(team) match{
-      case Some(p) => p
-      case None => 0
+  def getHighestLowestPrices(): Map[String, (Int, Int)] = {
+    mapdata.map {
+      case (food, prices) =>
+      food -> (prices.max, prices.min)
     }
-    (team, points)
   }
+
+
 
 
   // *******************************************************************************************************************
