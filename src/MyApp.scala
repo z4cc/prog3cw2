@@ -23,7 +23,7 @@ object MyApp extends App {
   // key is an Int, the value that will be read from the input
   // value is a function () => Boolean, i.e. no params and returns Boolean
   val actionMap = Map[Int, () => Boolean](
-    1 -> handleCurrentPrices,
+    1 -> handleCurrentPrice,
     2 -> handleHighestLowest,
     3 -> handleMedian,
     4 -> handleCompareAverage,
@@ -35,10 +35,10 @@ object MyApp extends App {
   // uses function readOption to show menu and read input
   // uses function menu to invoke menu action
   // will terminate if menu returns false
-    var opt = 0
-    do {
-      opt = readOption
-    } while (menu(opt))
+  var opt = 0
+  do {
+    opt = readOption
+  } while (menu(opt))
 
 
   // *******************************************************************************************************************
@@ -72,8 +72,8 @@ object MyApp extends App {
   }
 
   // handlers for menu options
-  def handleCurrentPrices(): Boolean = {
-    mnuShowMapResult(getCurrentPrices)
+  def handleCurrentPrice(): Boolean = {
+    mnuShowFoodValue(getCurrentPrice, "Current price")
     true
   }
 
@@ -83,7 +83,7 @@ object MyApp extends App {
   }
 
   def handleMedian(): Boolean = {
-    mnuShowMapResult(getMedianPrices)
+    mnuShowFoodValue(getMedianPrice, "Median price")
     true
   }
 
@@ -129,7 +129,7 @@ object MyApp extends App {
     mapBuffer
   }
 
-//helper to calculate median
+  //helper to calculate median
   def median(list: List[Int]): Double = {
     val sortedList = list.sorted
     val size = sortedList.size
@@ -162,7 +162,79 @@ object MyApp extends App {
   // each of these functions accepts user input if required for an operation,
   // invokes the relevant operation function and displays the results
 
+  def mnuShowFoodValue[A](getValueFunc: String => Option[A], valueType: String) = {
+    println("Enter food item:")
+    val food = readLine.toUpperCase
+    getValueFunc(food) match {
+      case Some(value) => println(s"$food: $valueType is ${value}p")
+      case None => println(s"Food '$food' not found.")
+    }
+  }
 
+  def mnuShowHighestLowest(f: (String) => Option[(Int, Int)]) = {
+    println("Enter food item:")
+    val food = readLine.toUpperCase
+    f(food) match {
+      case Some((high, low)) =>
+        println(s"$food: Highest price: ${high}p, Lowest price: ${low}p")
+      case None => println(s"Food '$food' not found.")
+    }
+  }
+
+  def mnuCompareAverages(f: (String, String) => (String, Double, String, Double)) = {
+    println("Enter first food:")
+    val food1 = readLine
+    println("Enter second food:")
+    val food2 = readLine
+
+    val (name1, avg1, name2, avg2) = f(food1, food2)
+
+    if (avg1 > 0 && avg2 > 0) {
+      println(s"Average price for $name1: ${avg1}p")
+      println(s"Average price for $name2: ${avg2}p")
+      val difference = Math.abs(avg1 - avg2)
+      val higherFood = if (avg1 > avg2) name1 else name2
+      println(s"$higherFood is more expensive on average by ${difference}p")
+    }
+  }
+
+  def mnuBasketTotal(f: (Map[String, Int]) => (Float, Map[String, Float])) = {
+    var continueAdding = true
+    basket = Map() // Reset basket
+
+    while (continueAdding) {
+      println("Enter food item (or 'DONE' to finish):")
+      val food = readLine.toUpperCase
+
+      if (food == "DONE") {
+        continueAdding = false
+      } else {
+        if (mapdata.contains(food)) {
+          println("Enter quantity (kg/litres):")
+          try {
+            val quantity = readInt()
+            basket = basket + (food -> (basket.getOrElse(food, 0f) + quantity))
+          } catch {
+            case _: Exception => println("Invalid quantity. Please enter a number.")
+          }
+        } else {
+          println(s"Warning: Food item '$food' not recognised.")
+        }
+      }
+    }
+    val (total, itemPrices) = f(basket)
+
+    if (itemPrices.nonEmpty) {
+      println("\nYour basket:")
+      itemPrices.foreach { case (food, price) =>
+        val currentPrice = getCurrentPrice(food).getOrElse(0)
+        println(f"$food: ${basket(food)}%.2f kg/l at ${currentPrice}p = ${price}%.2fp")
+      }
+      println(f"\nTotal basket value: ${total}%.2fp")
+    } else {
+      println("Basket is empty.")
+    }
+  }
 
   // *******************************************************************************************************************
   // OPERATION FUNCTIONS
@@ -194,7 +266,7 @@ object MyApp extends App {
     (food1.toUpperCase, avg1, food2.toUpperCase, avg2)
   }
 
-  def calculateBasketTotal(basket: Map[String, Float]): (Float, Map[String, Float]) = {
+  def calculateBasketTotal(basket: Map[String, Int]): (Float, Map[String, Int]) = {
     val itemPrices = basket.flatMap { case (food, quantity) =>
       getCurrentPrice(food).map(price => food -> (price * quantity))
     }
