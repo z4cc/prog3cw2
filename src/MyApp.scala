@@ -16,11 +16,20 @@ object MyApp extends App {
   // print data to check it's been read in correctly
   println(mapdata)
 
+  var basket: Map[String, Float] = Map()
+
   // define menu options as a Map of actions
   // for each menu item:
   // key is an Int, the value that will be read from the input
   // value is a function () => Boolean, i.e. no params and returns Boolean
-  val actionMap = Map[Int, () => Boolean](1 -> handleOne, 2 -> handleTwo, 3 -> handleThree)
+  val actionMap = Map[Int, () => Boolean](
+    1 -> handleCurrentPrices,
+    2 -> handleHighestLowest,
+    3 -> handleMedian,
+    4 -> handleCompareAverage,
+    5 -> handleBasket,
+    6 -> handleQuit
+  )
 
   // loop to read input and invoke menu option
   // uses function readOption to show menu and read input
@@ -38,10 +47,15 @@ object MyApp extends App {
   // shows menu and reads input
   def readOption: Int = {
     println(
-      """|Please select one of the following:
-        |  1 - show points for all teams
-        |  2 - show points for selected team
-        |  3 - quit""".stripMargin)
+      """|
+         |FOOD BASKET PRICES ANALYSIS
+         |Please select one of the following:
+         |  1 - Show current prices for a food
+         |  2 - Show highest and lowest prices for a food
+         |  3 - Show median price for a food
+         |  4 - Compare average prices of two foods
+         |  5 - Calculate food basket total
+         |  6 - Quit""".stripMargin)
     readInt()
   }
 
@@ -58,20 +72,36 @@ object MyApp extends App {
   }
 
   // handlers for menu options
-  def handleOne(): Boolean = {
-    mnuShowPoints(currentPoints) // calls function mnuShowPoints, which invokes function currentPoints
+  def handleCurrentPrices(): Boolean = {
+    mnuShowMapResult(getCurrentPrices)
     true
   }
 
-  def handleTwo(): Boolean = {
-    mnuShowPointsForTeam(currentPointsForTeam)
+  def handleHighestLowest(): Boolean = {
+    mnuShowHighestLowest(getHighestLowestPrices)
     true
   }
 
-  def handleThree(): Boolean = {
-    println("selected quit") // returns false so loop terminates
+  def handleMedian(): Boolean = {
+    mnuShowMapResult(getMedianPrices)
+    true
+  }
+
+  def handleCompareAverage(): Boolean = {
+    mnuCompareAverages(compareAveragePrices)
+    true
+  }
+
+  def handleBasket(): Boolean = {
+    mnuBasketTotal(calculateBasketTotal)
+    true
+  }
+
+  def handleQuit(): Boolean = {
+    println("Exiting application. Goodbye!")
     false
   }
+
 
 
   // *******************************************************************************************************************
@@ -132,15 +162,7 @@ object MyApp extends App {
   // each of these functions accepts user input if required for an operation,
   // invokes the relevant operation function and displays the results
 
-  def mnuShowPoints(f: () => Map[String, Int]) = {
-    f() foreach { case (x, y) => println(s"$x: $y") }
-  }
 
-  def mnuShowPointsForTeam(f: (String) => (String, Int)) = {
-    print("Team>")
-    val data = f(readLine)
-    println(s"${data._1}: ${data._2}")
-  }
 
   // *******************************************************************************************************************
   // OPERATION FUNCTIONS
