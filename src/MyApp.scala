@@ -172,7 +172,6 @@ object MyApp extends App {
   // each of these functions accepts user input if required for an operation,
   // invokes the relevant operation function and displays the results
 
-  // Generic function to display a single value for a specific food item with conversion to pounds
   private def mnuShowFoodValue[A](getValueFunc: String => Option[A], valueType: String): Unit = {
     println("Enter food item:")
     val food = readLine.toUpperCase
@@ -197,9 +196,22 @@ object MyApp extends App {
 
     val (name1, avg1, name2, avg2) = f(food1, food2)
 
-    if (avg1 > 0 && avg2 > 0) {
+    // Handle first food
+    if (avg1 > 0) {
       println(s"Average price for $name1: ${penceToPounds(avg1)}")
+    } else {
+      println(s"Food '$name1' not found.")
+    }
+
+    // Handle second food
+    if (avg2 > 0) {
       println(s"Average price for $name2: ${penceToPounds(avg2)}")
+    } else {
+      println(s"Food '$name2' not found.")
+    }
+
+    // Only compare if both foods exist
+    if (avg1 > 0 && avg2 > 0) {
       val difference = Math.abs(avg1 - avg2)
       val higherFood = if (avg1 > avg2) name1 else name2
       println(s"$higherFood is more expensive on average by ${penceToPounds(difference)}")
